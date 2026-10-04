@@ -29,7 +29,7 @@ python -m unittest discover -s tests -v
 dataset, then in a GPU notebook:
 
 ```bash
-!git clone https://github.com/<you>/mfld-net.git && cd mfld-net && pip install -q "albumentations>=1.4"
+!git clone https://github.com/githubmiguel24/mfld-net.git && cd mfld-net && pip install -q "albumentations>=1.4"
 !python kaggle_train.py --epochs 100        # prepare -> train -> evaluate; outputs in /kaggle/working/runs/betta
 ```
 

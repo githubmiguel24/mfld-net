@@ -3,7 +3,7 @@
 
 Kaggle notebook (GPU on, the dataset containing betta_data.zip attached via "Add Input"):
 
-    !git clone https://github.com/<you>/mfld-net.git
+    !git clone https://github.com/githubmiguel24/mfld-net.git
     %cd mfld-net
     !pip install -q "albumentations>=1.4"
     !python kaggle_train.py --epochs 100
