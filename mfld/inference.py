@@ -10,7 +10,7 @@ import torch
 from .config import ModelConfig
 from .data import normalise_image
 from .model import MFLDNet
-from .morphometry import KEYPOINT_NAMES, Spec, measure
+from .morphometry import Spec, measure
 
 
 def load_model(ckpt_path: str, device: torch.device | str = "cpu"):
@@ -47,7 +47,7 @@ def predict_images(model: MFLDNet, images_rgb: Sequence[np.ndarray], device: tor
     return results
 
 
-def draw_keypoints(image_rgb: np.ndarray, keypoints_px: np.ndarray, names: Sequence[str] | None = KEYPOINT_NAMES,
+def draw_keypoints(image_rgb: np.ndarray, keypoints_px: np.ndarray, names: Sequence[str] | None = None,
                    label: bool = True) -> np.ndarray:
     """Overlay of the predicted landmarks (returns a copy)."""
     out = image_rgb.copy()

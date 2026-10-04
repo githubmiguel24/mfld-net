@@ -3,7 +3,7 @@
 
     python train.py --data-root data/synthetic --annotations data/synthetic/annotations.json --out runs/demo
 
-Paper defaults: 224x224 input, 56x56 heatmaps, 16 keypoints, 8 ConvBlocks, kernel 9,
+Paper defaults: 224x224 input, 56x56 heatmaps, 16 keypoints (barramundi; this repo defaults to 13 betta keypoints), 8 ConvBlocks, kernel 9,
 Adam(lr 1e-3, betas (0.9, 0.999), eps 1e-8), StepLR(30, 0.1), batch 64, 50 epochs,
 40 % of the images for training+validation (70/30), the remaining 60 % held out for testing.
 """

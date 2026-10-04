@@ -17,7 +17,7 @@ from mfld.data import FishLandmarkDataset
 from mfld.engine import collect_predictions, get_device, keypoint_metrics
 from mfld.metrics import mean_absolute_difference, standard_deviation_of_difference
 from mfld.inference import load_model
-from mfld.morphometry import DEFAULT_SPEC, load_spec, measure
+from mfld.morphometry import default_spec, load_spec, measure
 from mfld.splits import load_splits, make_splits
 from mfld.data import load_annotations
 
@@ -47,7 +47,7 @@ def main():
     results = {"split": a.split, "n_images": len(ds), "losses": preds["losses"],
                "keypoints": keypoint_metrics(preds, model.cfg.img_size, a.kappa)}
 
-    spec = load_spec(a.spec) if a.spec else DEFAULT_SPEC
+    spec = load_spec(a.spec) if a.spec else default_spec(model.cfg.num_keypoints)
     pred_m = {t: [] for t in spec}
     ref_m = {t: [] for t in spec}
     for rec, p, size in zip(ds.records, preds["pred"], preds["orig_size"]):

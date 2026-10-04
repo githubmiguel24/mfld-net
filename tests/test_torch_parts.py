@@ -26,7 +26,7 @@ class ModelTests(unittest.TestCase):
     def setUp(self):
         from mfld.config import ModelConfig
         from mfld.model import MFLDNet
-        self.cfg = ModelConfig()
+        self.cfg = ModelConfig(num_keypoints=16)
         self.model = MFLDNet(self.cfg).eval()
 
     def test_output_shapes(self):
@@ -118,7 +118,7 @@ class PipelineTests(unittest.TestCase):
         from mfld.synthetic import generate_dataset
         with tempfile.TemporaryDirectory() as d:
             ann = generate_dataset(d, n=20, size=(256, 144), seed=0)
-            mcfg = ModelConfig(dim=32, depth=2, kernel_size=5)             # tiny model keeps the test fast
+            mcfg = ModelConfig(dim=32, depth=2, kernel_size=5, num_keypoints=16)             # tiny model keeps the test fast
             tcfg = TrainConfig(epochs=1, batch_size=4, labelled_frac=0.5)
             tr, va, te, _ = build_datasets(d, ann, mcfg, tcfg)
             item = tr[0]

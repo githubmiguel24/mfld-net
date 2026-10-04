@@ -17,7 +17,7 @@ class ModelConfig:
     depth: int = 8               # [paper] 8 ConvBlocks
     kernel_size: int = 9         # [paper] "increasing the size of the kernel to 9"
     dropout: float = 0.2         # [paper] spatial dropout rate 0.2
-    num_keypoints: int = 16      # [paper] 16 keypoints per fish
+    num_keypoints: int = 13      # betta dataset: 13 keypoints per fish ([paper], barramundi: 16)
     in_chans: int = 3            # [paper] RGB
 
     @property

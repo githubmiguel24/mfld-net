@@ -11,7 +11,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from mfld.heatmaps import decode_expectation, render_gaussian_heatmaps
 from mfld.metrics import (average_precision_recall, mean_absolute_difference, object_keypoint_similarity,
                           standard_deviation_of_difference)
-from mfld.morphometry import DEFAULT_SPEC, KEYPOINT_NAMES, measure
+from mfld.morphometry import (BARRAMUNDI_KEYPOINT_NAMES, BETTA_KEYPOINT_NAMES, DEFAULT_SPEC, default_spec,
+                              keypoint_names, measure)
 from mfld.splits import make_splits
 from mfld import synthetic
 
@@ -72,7 +73,16 @@ class MetricTests(unittest.TestCase):
 
 class MorphometryTests(unittest.TestCase):
     def test_names_and_spec(self):
-        self.assertEqual(len(KEYPOINT_NAMES), 16)
+        self.assertEqual(len(BARRAMUNDI_KEYPOINT_NAMES), 16)
+        self.assertEqual(len(BETTA_KEYPOINT_NAMES), 13)
+        self.assertEqual(keypoint_names(13), BETTA_KEYPOINT_NAMES)
+        self.assertEqual(keypoint_names(7), [])
+        for k in (13, 16):                                   # every spec index must exist in its layout
+            for a, b in default_spec(k).values():
+                idx = [a] if isinstance(a, int) else list(a)
+                idx += [b] if isinstance(b, int) else list(b)
+                self.assertTrue(all(0 <= i < k for i in idx))
+        self.assertEqual(set(measure(np.zeros((13, 2)))), set(DEFAULT_SPEC))
         self.assertEqual(set(DEFAULT_SPEC), {"total_length", "standard_length", "body_depth", "head_length"})
 
     def test_measure_simple(self):

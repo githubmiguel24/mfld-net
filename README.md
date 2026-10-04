@@ -50,7 +50,7 @@ Notes:
   keypoint are dropped: 1610 fish = 1126 train / 245 val / 239 test, using the supplied image-level splits rather than
   the paper's 40/60 split.
 * Keypoint order is the one in the export (`snout_tip, eye_center, dorsal_fin_base_anterior, …`).
-  `configs/betta_spec.json` defines the measurements from it (total length = snout→caudal centre, standard length =
+  The layout and measurements are the defaults for 13 keypoints (`BETTA_*` in `mfld/morphometry.py`, mirrored in `configs/betta_spec.json`); the measurements are (total length = snout→caudal centre, standard length =
   snout→mid caudal peduncle, body depth = anterior dorsal base→anterior anal base, head length = snout→eye) — these
   are assumptions, adjust them.
 * There is no pixel→mm calibration, so measurements are in pixels.
@@ -58,11 +58,11 @@ Notes:
 
 ## Quick start (synthetic data)
 
-The paper's barramundi images are not public, so a generator produces fish-like images with exact 16-point labels:
+The paper's barramundi images are not public, so a generator produces fish-like images with exact 16-point (barramundi layout) labels. The project default is the 13-point betta layout, so pass `--num-keypoints 16` here:
 
 ```bash
 python make_synthetic_data.py --out data/synthetic --n 250
-python train.py    --data-root data/synthetic --annotations data/synthetic/annotations.json --out runs/demo --epochs 50
+python train.py    --data-root data/synthetic --annotations data/synthetic/annotations.json --num-keypoints 16 --out runs/demo --epochs 50
 python evaluate.py --data-root data/synthetic --annotations data/synthetic/annotations.json --checkpoint runs/demo/best.pt
 python predict.py  --checkpoint runs/demo/best.pt --images data/synthetic/images/fish_00000.png --mm-per-pixel 0.9
 python benchmark.py                  # parameters / size / throughput (Table 1 of the paper)
@@ -84,13 +84,13 @@ python app.py --checkpoint runs/demo/best.pt --mm-per-pixel 0.9   # Gradio demo
 `scale` (sqrt of the fish segment area — used by OKS), `mm_per_pixel` and `manual_mm` are optional. The keypoint
 **order** is yours to define: edit `KEYPOINT_NAMES` / `DEFAULT_SPEC` in `mfld/morphometry.py` or pass `--spec my_spec.json`
 (`{"total_length": [0, [10, 11]], ...}`; a list of indices means "mean of these points"). Use `--num-keypoints K` in
-`train.py` when K ≠ 16 (the default measurement spec assumes the 16-point layout, so pass `--spec` then).
+`train.py`; K = 13 (betta) and 16 (barramundi) have built-in layouts/specs, any other K needs `--spec`.
 
 ## What follows the paper
 
 | Paper | Code |
 |---|---|
-| 224×224 input, 56×56 heatmaps, 16 keypoints | `mfld/config.py` |
+| 224×224 input, 56×56 heatmaps, 16 keypoints (here 13 for betta, `--num-keypoints 16` for the paper's layout) | `mfld/config.py` |
 | Patch embedding: conv 3→256, kernel 4, stride 4 | `MFLDNet.patch_embed` (`mfld/model.py`) |
 | 8 isometric ConvBlocks: depthwise conv → GELU → BatchNorm → (+ residual) → spatial dropout 0.2 → pointwise conv → GELU → BatchNorm | `ConvBlock` |
 | Kernel size 9, no pooling layers | `ModelConfig.kernel_size = 9` |
@@ -112,7 +112,7 @@ python app.py --checkpoint runs/demo/best.pt --mm-per-pixel 0.9   # Gradio demo
 3. **Not specified in the paper, chosen here:** target Gaussian σ = 1.5 heatmap px (`--sigma`); OKS falloff k_i = 0.05 for all
    keypoints (`--kappa`); ImageNet normalisation; heatmaps are spatial softmax probabilities (sum to 1); no norm/activation after
    the patch embedding; coordinates are normalised to [0, 1] so the coordinate loss is comparable to Table 1 (~0.04).
-4. **Keypoint layout** (16 points) is not published; the layout in `mfld/morphometry.py` is a reasonable assumption.
+4. **Keypoint layout** (16 points) is not published; the barramundi layout in `mfld/morphometry.py` is a reasonable assumption. The betta layout (13 points) comes from the dataset.
 5. **Augmentation units:** the paper prints shift/scale limits with a degree sign; they are fractions (±6.25 % shift, ±20 % scale).
    Blur "limit 1" is implemented as a 3×3 blur. Flips keep keypoint *indices* (as in the paper), so left/right and top/bottom
    semantics are not swapped — fine for roughly symmetric labels, consider removing flips if your indices are orientation-specific.

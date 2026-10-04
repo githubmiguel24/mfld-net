@@ -12,7 +12,7 @@ import cv2
 
 from mfld.engine import get_device
 from mfld.inference import draw_keypoints, load_model, predict_images
-from mfld.morphometry import KEYPOINT_NAMES, load_spec
+from mfld.morphometry import keypoint_names, load_spec
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
     device = get_device(a.device)
     model, _ = load_model(a.checkpoint, device)
     spec = load_spec(a.spec) if a.spec else None
-    names = KEYPOINT_NAMES if model.cfg.num_keypoints == len(KEYPOINT_NAMES) else []   # default layout only
+    names = keypoint_names(model.cfg.num_keypoints)
     imgs = []
     for p in a.images:
         bgr = cv2.imread(p, cv2.IMREAD_COLOR)
