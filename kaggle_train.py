@@ -22,18 +22,31 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def find_dataset(input_dir: str, work: str) -> str:
-    """Folder that contains raw/, annotations/ and splits/."""
-    hits = glob.glob(os.path.join(input_dir, "**", "annotations", "annotations.json"), recursive=True)
-    if hits:
-        return os.path.dirname(os.path.dirname(hits[0]))
-    zips = glob.glob(os.path.join(input_dir, "**", "betta_data.zip"), recursive=True)
-    if zips:
-        dst = os.path.join(work, "betta_raw")
-        print(f"extracting {zips[0]} -> {dst}")
-        with zipfile.ZipFile(zips[0]) as z:
-            z.extractall(dst)
-        return dst
-    sys.exit(f"betta dataset not found under {input_dir} - attach it with 'Add Input' in the notebook sidebar")
+    """Folder that contains raw/, annotations/ and splits/ (extracted, or inside any .zip)."""
+    for root, dirs, _ in os.walk(input_dir):
+        if {"raw", "annotations", "splits"} <= set(dirs):
+            return root
+    hits = glob.glob(os.path.join(input_dir, "**", "annotations.json"), recursive=True)
+    for h in hits:                                   # annotations.json without the expected sibling folders
+        root = os.path.dirname(os.path.dirname(h))
+        if os.path.isdir(os.path.join(root, "raw")):
+            return root
+    zips = sorted(glob.glob(os.path.join(input_dir, "**", "*.zip"), recursive=True))
+    for z in zips:
+        with zipfile.ZipFile(z) as zf:
+            if not any(n.endswith("annotations/annotations.json") for n in zf.namelist()):
+                continue
+            dst = os.path.join(work, "betta_raw")
+            print(f"extracting {z} -> {dst}")
+            zf.extractall(dst)
+        return find_dataset(dst, work)
+    listing = []
+    for root, dirs, files in os.walk(input_dir):
+        depth = root[len(input_dir):].count(os.sep)
+        if depth <= 3:
+            listing.append(f"{root}  dirs={dirs[:6]} files={files[:4]}")
+    sys.exit(f"betta dataset (raw/, annotations/, splits/) not found under {input_dir}. Contents:\n"
+             + "\n".join(listing[:40]) + "\nAttach the dataset with 'Add Input' and re-run.")
 
 
 def run(*cmd):
