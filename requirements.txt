@@ -1,0 +1,7 @@
+torch>=2.0
+numpy>=1.23
+opencv-python>=4.7
+albumentations>=1.4
+matplotlib>=3.6
+# optional - only for app.py
+gradio>=4.0

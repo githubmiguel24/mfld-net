@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.vscode/
+.idea/
+
+# data and outputs - never commit
+betta_data.zip
+*.zip
+data/
+runs/
+predictions/
+preds/
+*.pt
+*.pth
