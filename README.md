@@ -30,7 +30,7 @@ dataset, then in a GPU notebook:
 
 ```bash
 !git clone https://github.com/githubmiguel24/mfld-net.git && cd mfld-net && pip install -q "albumentations>=1.4"
-!python kaggle_train.py --epochs 100        # prepare -> train -> evaluate; outputs in /kaggle/working/runs/betta
+!python kaggle_train.py --epochs 50         # prepare -> train -> evaluate + dump; outputs in /kaggle/working/runs/betta_full
 ```
 
 or import `notebooks/kaggle_train.ipynb`. `kaggle_train.py` finds the data under `/kaggle/input` (extracted or still zipped).
@@ -39,9 +39,9 @@ The steps it runs, usable locally too:
 ```bash
 python prepare_betta.py --data-dir <folder with raw/ annotations/ splits/> --out data/betta
 python train.py    --data-root data/betta --annotations data/betta/annotations.json --splits data/betta/splits.json \
-                   --num-keypoints 13 --out runs/betta --epochs 100
+                   --num-keypoints 13 --out runs/betta_full --epochs 50
 python evaluate.py --data-root data/betta --annotations data/betta/annotations.json --splits data/betta/splits.json \
-                   --checkpoint runs/betta/best.pt --spec configs/betta_spec.json
+                   --checkpoint runs/betta_full/best.pt --spec configs/betta_spec.json --dump-predictions runs/betta_full
 ```
 
 Notes:
@@ -54,6 +54,14 @@ Notes:
   snout→mid caudal peduncle, body depth = anterior dorsal base→anterior anal base, head length = snout→eye) — these
   are assumptions, adjust them.
 * There is no pixel→mm calibration, so measurements are in pixels.
+* The supplied splits are used as they are: `train.py --splits` trains on 100 % of the train split (it records
+  `labelled_frac = 1.0`), selects the best checkpoint on val and never touches test. The paper's 40 % rule only applies
+  to the random split used without `--splits`.
+* `evaluate.py --dump-predictions DIR` writes `predictions_val.npz` / `predictions_test.npz` (`image_ids`,
+  `annotation_ids`, `files`, `pred_mu` (N, 13, 2) in ORIGINAL photo pixels, `pred_conf` (N, 13), `keypoint_names`) and
+  `preprocessing.json` (crop, resize, normalisation, decoding, mapping back). A photo with several fish appears once per
+  fish, so match on `annotation_ids` when `image_ids` repeat. `train.py` also writes `preprocessing.json` next to the checkpoint.
+* Optional, off by default (the paper's recipe): `--no-vflip` and `--img-size N` in `train.py`.
 * `--workers` defaults to 4 on Kaggle; use `--workers 0` locally on Windows if data loading hangs.
 
 ## Quick start (synthetic data)

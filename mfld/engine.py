@@ -97,7 +97,7 @@ def collect_predictions(model, dataset, device, batch_size: int = 64, num_worker
     model.eval()
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     crit = MultiTaskLoss()
-    pred, gt, conf, scale, size, sums, n = [], [], [], [], [], defaultdict(float), 0
+    pred, gt, conf, conf_kp, scale, size, sums, n = [], [], [], [], [], [], defaultdict(float), 0
     for batch in loader:
         out = model(batch["image"].to(device))
         losses = crit(out, batch["heatmaps"].to(device), batch["coords"].to(device))
@@ -107,10 +107,12 @@ def collect_predictions(model, dataset, device, batch_size: int = 64, num_worker
         n += b
         pred.append(out.coords.cpu().numpy())
         gt.append(batch["coords"].numpy())
-        conf.append(out.heatmaps.flatten(2).amax(-1).mean(-1).cpu().numpy())   # mean peak value over keypoints
+        peak = out.heatmaps.flatten(2).amax(-1)                                # (B, K) peak probability per keypoint
+        conf_kp.append(peak.cpu().numpy())
+        conf.append(peak.mean(-1).cpu().numpy())                               # mean peak value over keypoints
         scale.append(batch["scale"].numpy())
         size.append(batch["orig_size"].numpy())
-    return {"pred": np.concatenate(pred), "gt": np.concatenate(gt), "conf": np.concatenate(conf),
+    return {"pred": np.concatenate(pred), "gt": np.concatenate(gt), "conf": np.concatenate(conf), "conf_kp": np.concatenate(conf_kp),
             "scale": np.concatenate(scale), "orig_size": np.concatenate(size),
             "losses": {k: v / max(n, 1) for k, v in sums.items()}}
 

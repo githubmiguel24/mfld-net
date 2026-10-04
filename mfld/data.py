@@ -35,12 +35,22 @@ def load_annotations(path: str) -> List[dict]:
     return records
 
 
-def build_train_transform():
+def load_annotation_meta(path: str) -> dict:
+    """Top-level fields of the annotation file other than the records (keypoint_names, preprocessing, ...)."""
+    with open(path) as f:
+        data = json.load(f)
+    return {k: v for k, v in data.items() if k != "images"} if isinstance(data, dict) else {}
+
+
+def build_train_transform(vflip: bool = True):
     """The six augmentations listed in the paper, applied to the training set only:
 
     (1) horizontal flip p=.5   (2) vertical flip p=.5
     (3) shift (limit 0.0625) + scale (limit 0.20) p=.5   (4) rotation limit 20 deg p=.5
     (5) blur (kernel 3) p=.3   (6) RGB shift (25, 25, 25) p=.3
+
+    ``vflip=False`` drops (2) - an option for subjects that are always upright (a flipped fish also swaps
+    the meaning of "upper"/"lower" keypoints while their indices stay put).
 
     NB: the paper prints the shift/scale limits with a degree sign; they are fractions
     (as in Albumentations' ShiftScaleRotate). Keypoints follow every geometric change.
@@ -50,7 +60,7 @@ def build_train_transform():
     return A.Compose(
         [
             A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
+            *([A.VerticalFlip(p=0.5)] if vflip else []),
             A.Affine(scale=(0.8, 1.2), translate_percent=(-0.0625, 0.0625), rotate=0, p=0.5),
             A.Rotate(limit=20, p=0.5),
             A.Blur(blur_limit=(3, 3), p=0.3),
@@ -74,12 +84,12 @@ def keypoint_scale(kp: np.ndarray) -> float:
 
 class FishLandmarkDataset(Dataset):
     def __init__(self, records: List[dict], root: str, model_cfg: ModelConfig | None = None,
-                 augment: bool = False, sigma: float = 1.5):
+                 augment: bool = False, sigma: float = 1.5, vflip: bool = True):
         self.records = records
         self.root = root
         self.cfg = model_cfg or ModelConfig()
         self.sigma = sigma
-        self.transform = build_train_transform() if augment else None
+        self.transform = build_train_transform(vflip) if augment else None
 
     def __len__(self) -> int:
         return len(self.records)
@@ -120,7 +130,8 @@ def build_datasets(root: str, annotations: str, model_cfg: ModelConfig, train_cf
     records = load_annotations(annotations)
     splits = splits or make_splits(len(records), train_cfg.labelled_frac, train_cfg.train_frac, train_cfg.seed)
     pick = lambda ids: [records[j] for j in ids]
-    train = FishLandmarkDataset(pick(splits["train"]), root, model_cfg, augment=True, sigma=train_cfg.sigma)
+    train = FishLandmarkDataset(pick(splits["train"]), root, model_cfg, augment=True, sigma=train_cfg.sigma,
+                               vflip=train_cfg.vflip)
     val = FishLandmarkDataset(pick(splits["val"]), root, model_cfg, augment=False, sigma=train_cfg.sigma)
     test = FishLandmarkDataset(pick(splits["test"]), root, model_cfg, augment=False, sigma=train_cfg.sigma)
     return train, val, test, splits

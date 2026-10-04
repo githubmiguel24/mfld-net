@@ -134,5 +134,16 @@ class PipelineTests(unittest.TestCase):
             self.assertIn("AP", res)
 
 
+class TestPixelMapping(unittest.TestCase):
+    def test_crop_coordinates_map_back_to_original_photo(self):
+        from evaluate import to_original_pixels
+        recs = [{"crop": [100, 50, 300, 250]}, {}]                       # 200x200 crop at (100, 50); whole image
+        norm = np.array([[[0.5, 0.25]], [[0.5, 0.5]]], np.float32)        # (N=2, K=1, 2)
+        size = np.array([[200, 200], [640, 480]], np.float32)             # crop / image size (w, h)
+        out = to_original_pixels(norm, size, recs)
+        np.testing.assert_allclose(out[0, 0], [200.0, 100.0])             # 0.5*200+100, 0.25*200+50
+        np.testing.assert_allclose(out[1, 0], [320.0, 240.0])
+
+
 if __name__ == "__main__":
     unittest.main()

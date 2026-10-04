@@ -81,13 +81,17 @@ def main():
             "keypoints": np.round(crop_pts, 2).tolist(),
             "visibility": kp[:, 2].astype(int).tolist(),
             "scale": round(float(np.sqrt(w * h)), 2),
+            "crop": [x0, y0, x1, y1],          # crop window in the ORIGINAL photo (x0, y0, x1, y1) - for mapping back
             "image_id": im["id"],
             "annotation_id": ann["id"],
         })
         splits[split].append(len(records) - 1)
 
     with open(os.path.join(a.out, "annotations.json"), "w") as f:
-        json.dump({"keypoint_names": names, "images": records}, f)
+        json.dump({"keypoint_names": names,
+                   "preprocessing": {"input": "fish_box_crop", "margin": a.margin,
+                                     "crop_covers_all_keypoints": True},
+                   "images": records}, f)
     with open(os.path.join(a.out, "splits.json"), "w") as f:
         json.dump(splits, f)
     print(f"{len(records)} fish -> {a.out} | " + " / ".join(f"{k} {len(v)}" for k, v in splits.items())

@@ -19,7 +19,37 @@ from mfld.metrics import mean_absolute_difference, standard_deviation_of_differe
 from mfld.inference import load_model
 from mfld.morphometry import default_spec, load_spec, measure
 from mfld.splits import load_splits, make_splits
-from mfld.data import load_annotations
+from mfld.data import load_annotation_meta, load_annotations
+from mfld.preprocessing import write_preprocessing
+
+
+def to_original_pixels(coords_norm: np.ndarray, orig_size: np.ndarray, records: list) -> np.ndarray:
+    """(N, K, 2) normalised network-frame coords -> original-photo pixels.
+    Undo the squash with the crop size, then add the crop origin (records without 'crop' = whole image)."""
+    out = coords_norm * orig_size[:, None, :]
+    for i, r in enumerate(records):
+        if r.get("crop"):
+            out[i] += np.asarray(r["crop"][:2], np.float32)
+    return out.astype(np.float32)
+
+
+def dump_predictions(model, records, splits, data_root, out_dir, device, sigma, ann_meta):
+    """predictions_<split>.npz for val and test: image_ids, annotation_ids, files, pred_mu (original pixels), pred_conf."""
+    os.makedirs(out_dir, exist_ok=True)
+    for name in ("val", "test"):
+        recs = [records[i] for i in splits[name]]
+        ds = FishLandmarkDataset(recs, data_root, model.cfg, augment=False, sigma=sigma)
+        preds = collect_predictions(model, ds, device)
+        mu = to_original_pixels(preds["pred"], preds["orig_size"], recs)
+        np.savez(os.path.join(out_dir, f"predictions_{name}.npz"),
+                 image_ids=np.array([str(r.get("image_id", os.path.splitext(os.path.basename(r["file"]))[0])) for r in recs]),
+                 annotation_ids=np.array([str(r.get("annotation_id", i)) for i, r in enumerate(recs)]),
+                 files=np.array([r["file"] for r in recs]),
+                 pred_mu=mu, pred_conf=preds["conf_kp"].astype(np.float32),
+                 keypoint_names=np.array(ann_meta.get("keypoint_names", [])))
+        print(f"wrote {name}: {len(recs)} fish, pred_mu {mu.shape}, pred_conf {preds['conf_kp'].shape}")
+    write_preprocessing(os.path.join(out_dir, "preprocessing.json"), model.cfg, ann_meta.get("preprocessing"),
+                        ann_meta.get("keypoint_names"))
 
 
 def main():
@@ -32,6 +62,9 @@ def main():
     ap.add_argument("--kappa", type=float, default=0.05, help="OKS per-keypoint falloff constant")
     ap.add_argument("--spec", default=None, help="JSON measurement spec (see mfld/morphometry.py)")
     ap.add_argument("--out", default=None, help="write the results json here")
+    ap.add_argument("--dump-predictions", default=None, metavar="DIR",
+                    help="write predictions_val.npz, predictions_test.npz and preprocessing.json to DIR "
+                         "(pred_mu in ORIGINAL image pixels)")
     ap.add_argument("--device", default="auto")
     a = ap.parse_args()
 
@@ -40,6 +73,9 @@ def main():
     records = load_annotations(a.annotations)
     sp_path = a.splits or os.path.join(os.path.dirname(a.checkpoint), "splits.json")
     splits = load_splits(sp_path) if os.path.exists(sp_path) else make_splits(len(records), seed=ckpt["train_cfg"]["seed"])
+    if a.dump_predictions:
+        dump_predictions(model, records, splits, a.data_root, a.dump_predictions, device,
+                         ckpt["train_cfg"].get("sigma", TrainConfig.sigma), load_annotation_meta(a.annotations))
     ds = FishLandmarkDataset([records[i] for i in splits[a.split]], a.data_root, model.cfg,
                              augment=False, sigma=ckpt["train_cfg"].get("sigma", TrainConfig.sigma))
     preds = collect_predictions(model, ds, device)

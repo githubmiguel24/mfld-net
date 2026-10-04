@@ -42,3 +42,4 @@ class TrainConfig:
     train_frac: float = 0.7      # [paper] 70 % of that 40 % for training, 30 % for validation
     sigma: float = 1.5           # [assumed] std-dev (in heatmap pixels) of the target Gaussians
     seed: int = 0
+    vflip: bool = True           # [paper] vertical flip p=.5; set False for subjects that are always upright
