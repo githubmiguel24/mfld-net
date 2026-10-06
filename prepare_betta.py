@@ -17,6 +17,7 @@ are dropped. Writes ``annotations.json`` (repo format) and ``splits.json`` (inde
 import argparse
 import json
 import os
+import sys
 from collections import Counter
 
 import cv2
@@ -41,8 +42,11 @@ def main():
             for i in json.load(f):
                 img_split[int(i)] = split
 
+    missing = sorted(i for i in img_split if i not in images)
+    if missing:
+        sys.exit(f"{len(missing)} image ids in the split files are not in annotations.json, e.g. {missing[:5]}")
     os.makedirs(os.path.join(a.out, "images"), exist_ok=True)
-    records, splits, dropped = [], {"train": [], "val": [], "test": []}, Counter()
+    records, splits, dropped = [], {"train": [], "val": [], "test": [], "val_all": [], "test_all": []}, Counter()
     cache = {}
     for ann in sorted(coco["annotations"], key=lambda x: x["id"]):
         im = images[ann["image_id"]]
@@ -51,8 +55,9 @@ def main():
         if split is None:
             dropped["not in any split"] += 1
             continue
-        if (kp[:, 2] == 0).any():
-            dropped["unlabelled keypoint"] += 1
+        unlabelled = bool((kp[:, 2] == 0).any())
+        if unlabelled and split == "train":      # (0, 0) placeholders cannot be trained on without a masked loss
+            dropped["unlabelled keypoint (train only)"] += 1
             continue
         if im["id"] not in cache:
             cache = {im["id"]: cv2.imread(os.path.join(a.data_dir, "raw", im["file_name"]), cv2.IMREAD_COLOR)}
@@ -83,9 +88,14 @@ def main():
             "scale": round(float(np.sqrt(w * h)), 2),
             "crop": [x0, y0, x1, y1],          # crop window in the ORIGINAL photo (x0, y0, x1, y1) - for mapping back
             "image_id": im["id"],
+            "split": split,
+            "labelled": not unlabelled,
             "annotation_id": ann["id"],
         })
-        splits[split].append(len(records) - 1)
+        if not unlabelled:
+            splits[split].append(len(records) - 1)              # used for training / checkpoint selection / metrics
+        if split != "train":
+            splits[split + "_all"].append(len(records) - 1)     # every fish, for the predictions dump
 
     with open(os.path.join(a.out, "annotations.json"), "w") as f:
         json.dump({"keypoint_names": names,
@@ -94,7 +104,25 @@ def main():
                    "images": records}, f)
     with open(os.path.join(a.out, "splits.json"), "w") as f:
         json.dump(splits, f)
-    print(f"{len(records)} fish -> {a.out} | " + " / ".join(f"{k} {len(v)}" for k, v in splits.items())
+    # reconcile every id of every split file with the fish that were kept
+    report = {}
+    for split in ("train", "val", "test"):
+        ids = {i for i, s in img_split.items() if s == split}
+        n_ann = sum(1 for an in coco["annotations"] if an["image_id"] in ids)
+        all_key = split if split == "train" else split + "_all"
+        kept = {records[j]["image_id"] for j in splits[all_key]}
+        report[split] = {"image_ids_in_json": len(ids), "annotations_for_these_images": n_ann,
+                         "fish_with_all_keypoints_labelled": len(splits[split]),
+                         "fish_in_predictions_dump": len(splits[all_key]),
+                         "fish_not_used": n_ann - len(splits[all_key]),
+                         "image_ids_with_no_fish": sorted(ids - kept)}
+    with open(os.path.join(a.out, "splits_report.json"), "w") as f:
+        json.dump(report, f, indent=1)
+    for k, v in report.items():
+        print(f"  {k:5s}: {v['image_ids_in_json']} ids -> {v['annotations_for_these_images']} fish annotated | "
+              f"{v['fish_with_all_keypoints_labelled']} fully labelled (training/metrics) | "
+              f"{v['fish_in_predictions_dump']} in predictions dump | {len(v['image_ids_with_no_fish'])} ids with no fish")
+    print(f"{len(records)} fish -> {a.out} | " + " / ".join(f"{k} {len(v)}" for k, v in splits.items() if not k.endswith("_all"))
           + f" | {len(names)} keypoints | dropped: {dict(dropped) or 'none'}")
 
 

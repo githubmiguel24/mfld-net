@@ -46,9 +46,11 @@ python evaluate.py --data-root data/betta --annotations data/betta/annotations.j
 
 Notes:
 
-* Each fish annotation becomes one sample, cropped to its box (+10 % margin). The 45 annotations with an unlabelled
-  keypoint are dropped: 1610 fish = 1126 train / 245 val / 239 test, using the supplied image-level splits rather than
-  the paper's 40/60 split.
+* Each fish annotation becomes one sample, cropped to its box (+10 % margin). Fish with an unlabelled keypoint (a (0, 0)
+  placeholder, v = 0) cannot be trained on without a masked loss, so the 32 such fish in the train split are left out:
+  1126 of 1158 train fish are used (`prepare_betta.py` prints and saves `splits_report.json` reconciling every id).
+  Validation/metrics use the fully-labelled fish (245 val / 239 test); the predictions dump covers *every* val/test fish
+  (250 / 247) with a `kp_labelled` mask. Supplied image-level splits are used instead of the paper's 40/60 split.
 * Keypoint order is the one in the export (`snout_tip, eye_center, dorsal_fin_base_anterior, …`).
   The layout and measurements are the defaults for 13 keypoints (`BETTA_*` in `mfld/morphometry.py`, mirrored in `configs/betta_spec.json`); the measurements are (total length = snout→caudal centre, standard length =
   snout→mid caudal peduncle, body depth = anterior dorsal base→anterior anal base, head length = snout→eye) — these
@@ -58,7 +60,7 @@ Notes:
   `labelled_frac = 1.0`), selects the best checkpoint on val and never touches test. The paper's 40 % rule only applies
   to the random split used without `--splits`.
 * `evaluate.py --dump-predictions DIR` writes `predictions_val.npz` / `predictions_test.npz` (`image_ids`,
-  `annotation_ids`, `files`, `pred_mu` (N, 13, 2) in ORIGINAL photo pixels, `pred_conf` (N, 13), `keypoint_names`) and
+  `annotation_ids`, `files`, `pred_mu` (N, 13, 2) in ORIGINAL photo pixels, `pred_conf` (N, 13), `kp_labelled` (N, 13) bool, `keypoint_names`) and
   `preprocessing.json` (crop, resize, normalisation, decoding, mapping back). A photo with several fish appears once per
   fish, so match on `annotation_ids` when `image_ids` repeat. `train.py` also writes `preprocessing.json` next to the checkpoint.
 * Optional, off by default (the paper's recipe): `--no-vflip` and `--img-size N` in `train.py`.

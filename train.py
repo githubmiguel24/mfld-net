@@ -63,6 +63,15 @@ def main():
     with open(os.path.join(a.out, "config.json"), "w") as f:
         json.dump({"model": model_cfg.to_dict(), "train": asdict(train_cfg)}, f, indent=1)
 
+    if a.splits:
+        # every fish whose image is in train.json (and was not dropped by prepare_betta.py) must be in the train set
+        records = train_ds.records + val_ds.records + test_ds.records
+        tagged = sum(r.get("split") == "train" for r in records)
+        assert not tagged or len(train_ds) == tagged, f"train set has {len(train_ds)} fish, split file implies {tagged}"
+        assert all(r.get("split", "train") == "train" for r in train_ds.records), "non-train fish in the train set"
+        assert all(r.get("split", "val") == "val" for r in val_ds.records), "non-val fish in the val set"
+        print(f"using ALL {len(train_ds)} fish of the train split for training (val {len(val_ds)} for checkpoint "
+              f"selection; test {len(test_ds)} untouched)")
     meta = load_annotation_meta(a.annotations)
     write_preprocessing(os.path.join(a.out, "preprocessing.json"), model_cfg, meta.get("preprocessing"),
                         meta.get("keypoint_names"))

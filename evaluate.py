@@ -34,10 +34,11 @@ def to_original_pixels(coords_norm: np.ndarray, orig_size: np.ndarray, records: 
 
 
 def dump_predictions(model, records, splits, data_root, out_dir, device, sigma, ann_meta):
-    """predictions_<split>.npz for val and test: image_ids, annotation_ids, files, pred_mu (original pixels), pred_conf."""
+    """predictions_<split>.npz for val and test: image_ids, annotation_ids, files, pred_mu (original pixels), pred_conf,
+    kp_labelled (N, K) bool - False where the annotation has no label (placeholder at (0, 0)); mask these when scoring."""
     os.makedirs(out_dir, exist_ok=True)
     for name in ("val", "test"):
-        recs = [records[i] for i in splits[name]]
+        recs = [records[i] for i in splits.get(name + "_all", splits[name])]      # every fish, labelled or not
         ds = FishLandmarkDataset(recs, data_root, model.cfg, augment=False, sigma=sigma)
         preds = collect_predictions(model, ds, device)
         mu = to_original_pixels(preds["pred"], preds["orig_size"], recs)
@@ -45,6 +46,7 @@ def dump_predictions(model, records, splits, data_root, out_dir, device, sigma, 
                  image_ids=np.array([str(r.get("image_id", os.path.splitext(os.path.basename(r["file"]))[0])) for r in recs]),
                  annotation_ids=np.array([str(r.get("annotation_id", i)) for i, r in enumerate(recs)]),
                  files=np.array([r["file"] for r in recs]),
+                 kp_labelled=np.array([[v > 0 for v in r.get("visibility", [1] * mu.shape[1])] for r in recs]),
                  pred_mu=mu, pred_conf=preds["conf_kp"].astype(np.float32),
                  keypoint_names=np.array(ann_meta.get("keypoint_names", [])))
         print(f"wrote {name}: {len(recs)} fish, pred_mu {mu.shape}, pred_conf {preds['conf_kp'].shape}")
