@@ -15,9 +15,11 @@ keypoints stay in the pixels of the saved crop. Annotations with an unlabelled k
 are dropped. Writes ``annotations.json`` (repo format) and ``splits.json`` (index lists).
 """
 import argparse
+import functools
 import json
 import os
 import sys
+import time
 from collections import Counter
 
 import cv2
@@ -47,8 +49,14 @@ def main():
         sys.exit(f"{len(missing)} image ids in the split files are not in annotations.json, e.g. {missing[:5]}")
     os.makedirs(os.path.join(a.out, "images"), exist_ok=True)
     records, splits, dropped = [], {"train": [], "val": [], "test": [], "val_all": [], "test_all": []}, Counter()
-    cache = {}
-    for ann in sorted(coco["annotations"], key=lambda x: x["id"]):
+    @functools.lru_cache(maxsize=8)                   # photos with several fish are read once
+    def read(file_name):
+        return cv2.imread(os.path.join(a.data_dir, "raw", file_name), cv2.IMREAD_COLOR)
+
+    t0, todo = time.time(), sorted(coco["annotations"], key=lambda x: x["id"])
+    for n, ann in enumerate(todo, 1):
+        if n % 100 == 0 or n == len(todo):
+            print(f"  prepared {n}/{len(todo)} annotations ({time.time() - t0:.0f}s)", flush=True)
         im = images[ann["image_id"]]
         split = img_split.get(im["id"])
         kp = np.asarray(ann["keypoints"], np.float32).reshape(-1, 3)
@@ -59,9 +67,7 @@ def main():
         if unlabelled and split == "train":      # (0, 0) placeholders cannot be trained on without a masked loss
             dropped["unlabelled keypoint (train only)"] += 1
             continue
-        if im["id"] not in cache:
-            cache = {im["id"]: cv2.imread(os.path.join(a.data_dir, "raw", im["file_name"]), cv2.IMREAD_COLOR)}
-        img = cache[im["id"]]
+        img = read(im["file_name"])
         if img is None:
             dropped["unreadable image"] += 1
             continue

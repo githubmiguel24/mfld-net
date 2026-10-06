@@ -51,7 +51,7 @@ def find_dataset(input_dir: str, work: str) -> str:
 
 def run(*cmd):
     print("\n$", " ".join(cmd), flush=True)
-    subprocess.run([sys.executable, *cmd], cwd=HERE, check=True)
+    subprocess.run([sys.executable, "-u", *cmd], cwd=HERE, check=True)   # -u: show output live
 
 
 def main():
